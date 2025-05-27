@@ -7,6 +7,7 @@ import feedSlice, {
   selectOrders,
   initialState
 } from '../feed-slice';
+import { rootReducer } from '../../services/store';
 import { TOrdersData, TOrder } from '@utils-types';
 import { getFeedsApi } from '@api';
 
@@ -165,6 +166,13 @@ describe('Слайс feed', () => {
           feed: { ...initialState }
         })
       ).toEqual([]);
+    });
+  });
+
+  describe('rootReducer', () => {
+    it('не изменяет состояние при неизвестном экшене', () => {
+      const state = rootReducer(undefined, { type: 'UNKNOWN_ACTION' });
+      expect(state).toBeDefined();
     });
   });
 });

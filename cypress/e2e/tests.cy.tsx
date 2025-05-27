@@ -1,4 +1,4 @@
-// Повторяющиеся селекторы
+/// <reference types="cypress" />
 const SELECTORS = {
   userApi: '/api/auth/user',
   ingredientsApi: '/api/ingredients',
@@ -15,8 +15,14 @@ const SELECTORS = {
   orderButton: 'Оформить заказ',
   orderConfirmationText: 'идентификатор заказа',
   constructorTitle: 'Соберите бургер',
-  personalCabinet: 'Личный кабинет',
+  personalCabinet: 'Личный кабинет'
 };
+
+afterEach(() => {
+  // Очищаем токены после каждого теста
+  cy.clearCookies();
+  cy.window().then((win) => win.localStorage.clear());
+});
 
 describe('Авторизация и профиль', () => {
   it('Переход в профиль после входа', () => {
@@ -26,7 +32,7 @@ describe('Авторизация и профиль', () => {
         success: true,
         user: {
           email: 'test_user@example.com',
-          name: SELECTORS.testUserName,
+          name: SELECTORS.testUserName
         }
       }
     }).as('getUser');
@@ -35,31 +41,33 @@ describe('Авторизация и профиль', () => {
     cy.visit('/');
     cy.contains(SELECTORS.personalCabinet).click();
     cy.wait('@getUser');
-
     cy.contains(SELECTORS.testUserName).click();
     cy.url().should('include', SELECTORS.profileUrlPart);
     cy.get('form', { timeout: 10000 }).should('exist');
-    cy.get(SELECTORS.userNameInput).should('have.value', SELECTORS.testUserName);
+    cy.get(SELECTORS.userNameInput).should(
+      'have.value',
+      SELECTORS.testUserName
+    );
   });
 });
 
 describe('Функциональность конструктора бургеров', () => {
   beforeEach(() => {
+    // Подготовка фикстур и моков
     cy.fixture('ingredients.json').as('ingredientsData');
     cy.fixture('user.json').as('userData');
-
     cy.intercept('GET', SELECTORS.ingredientsApi, {
       fixture: 'ingredients.json'
     }).as('getIngredients');
+    cy.intercept('GET', SELECTORS.userApi, { fixture: 'user.json' }).as(
+      'getUser'
+    );
 
-    cy.intercept('GET', SELECTORS.userApi, {
-      fixture: 'user.json'
-    }).as('getUser');
-
+    // Устанавливаем токены
     cy.setCookie('accessToken', 'mockToken');
-    cy.window().then(win => {
-      win.localStorage.setItem('refreshToken', 'mockToken');
-    });
+    cy.window().then((win) =>
+      win.localStorage.setItem('refreshToken', 'mockToken')
+    );
 
     cy.visit('/');
     cy.contains(SELECTORS.constructorTitle, { timeout: 10000 }).should('exist');
@@ -71,14 +79,25 @@ describe('Функциональность конструктора бургер
   });
 
   it('Добавление булки в конструктор', () => {
-    cy.contains(SELECTORS.bunName).next().click();
-    cy.contains(SELECTORS.bunName, { timeout: 10000 }).should('exist');
+    cy.contains(SELECTORS.bunName).as('bunElement');
+    cy.get('@bunElement').next().click();
+
+    cy.get('[data-testid="constructor"]').within(() => {
+      cy.get('[data-testid="bun"]').should('contain.text', SELECTORS.bunName);
+    });
   });
 
   it('Добавление начинки в конструктор', () => {
     cy.contains('Начинки').scrollIntoView().click({ force: true });
-    cy.contains(SELECTORS.fillingName).next().click();
-    cy.contains(SELECTORS.fillingName).should('exist');
+    cy.contains(SELECTORS.fillingName).as('fillingElement');
+    cy.get('@fillingElement').next().click();
+
+    cy.get('[data-testid="constructor"]').within(() => {
+      cy.get('[data-testid="filling"]').should(
+        'contain.text',
+        SELECTORS.fillingName
+      );
+    });
   });
 
   it('Добавление ингредиентов в заказ и очистка конструктора', () => {
@@ -87,9 +106,12 @@ describe('Функциональность конструктора бургер
       statusCode: 200
     }).as('newOrder');
 
-    cy.contains(SELECTORS.bunName).next().click();
+    cy.contains(SELECTORS.bunName).as('bunElement');
+    cy.get('@bunElement').next().click();
+
     cy.contains('Начинки').scrollIntoView();
-    cy.contains(SELECTORS.fillingName).next().click();
+    cy.contains(SELECTORS.fillingName).as('fillingElement');
+    cy.get('@fillingElement').next().click();
 
     cy.contains(SELECTORS.orderButton).should('not.be.disabled').click();
     cy.wait('@newOrder', { timeout: 30000 })
@@ -98,19 +120,32 @@ describe('Функциональность конструктора бургер
 
     cy.contains(SELECTORS.orderConfirmationText).should('be.visible');
     cy.get('body').type('{esc}');
-    cy.contains(SELECTORS.bunPlaceholder).should('exist');
+
+    // Проверяем, что конструктор полностью пуст
+    cy.get('[data-testid="constructor"]').within(() => {
+      cy.get('[data-testid="bun"]').should('not.exist');
+      cy.get('[data-testid="filling"]').should('not.exist');
+      cy.get('[data-testid="sauce"]').should('not.exist');
+    });
   });
 
   it('Открытие и закрытие модального окна ингредиента', () => {
-    cy.contains(SELECTORS.bunOption).click();
-    cy.url().should('include', '/ingredients/');
+    cy.get('[data-testid="modal"]').should('not.exist');
+    cy.contains(SELECTORS.bunOption).as('ingredientElement');
+    cy.get('@ingredientElement').click();
+
+    cy.get('[data-testid="modal"]')
+      .should('exist')
+      .and('contain.text', SELECTORS.bunOption);
+
     cy.get('body').type('{esc}');
-    cy.url().should('eq', SELECTORS.homeUrl);
+    cy.get('[data-testid="modal"]').should('not.exist');
   });
 
   it('Закрытие модального окна через клик на оверлей', () => {
     cy.contains(SELECTORS.bunOption).click();
+    cy.get('[data-testid="modal"]').should('exist');
     cy.get('body').click(10, 10);
-    cy.url().should('eq', SELECTORS.homeUrl);
+    cy.get('[data-testid="modal"]').should('not.exist');
   });
 });

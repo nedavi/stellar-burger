@@ -105,6 +105,5 @@
     "extends": [
       "plugin:storybook/recommended"
     ]
-  },
-  "homepage": "https://Michail19.github.io/Project_Yandex_STELLAR-BURGERS-MAIN/"
+  }
 }
